@@ -25,22 +25,17 @@ export async function extractContractData(formData: FormData) {
     
     let result;
     
-    // Step 2: Decide whether to use vision or text-based extraction
-    // High-quality vision is usually better for PDFs with complex layouts
-    if (file.type === 'application/pdf' && buffer.length < 5 * 1024 * 1024) {
-      const base64 = buffer.toString('base64');
-      const imageDataUrl = `data:application/pdf;base64,${base64}`;
-      result = await extractContractFromImages([imageDataUrl]);
+    // Step 2: Use text-based extraction for documents (PDF/Word/Excel)
+    // The previous vision-first approach for PDFs triggered "Image format error" on the API
+    if (extraction.text && extraction.text.trim().length > 50) {
+      console.log('[extractContractData] Using text extraction...');
+      result = await extractContractFromText(extraction.text);
     } else {
-      // For Word, Excel, and large PDFs, use text-based extraction
-      // If text extraction failed but file is valid, try vision as fallback
-      if (extraction.text && extraction.text.trim().length > 10) {
-        result = await extractContractFromText(extraction.text);
-      } else {
-        const base64 = buffer.toString('base64');
-        const imageDataUrl = `data:${file.type};base64,${base64}`;
-        result = await extractContractFromImages([imageDataUrl]);
-      }
+      // Last resort: try vision (only if file size is reasonable)
+      console.log('[extractContractData] Falling back to vision extraction...');
+      const base64 = buffer.toString('base64');
+      const imageDataUrl = `data:${file.type};base64,${base64}`;
+      result = await extractContractFromImages([imageDataUrl]);
     }
     
     // Step 3: Save to Database (Production Ready)
