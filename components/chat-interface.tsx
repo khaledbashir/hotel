@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, MessageSquare, FileText, Bot, User } from "lucide-react";
+import { Send, MessageSquare, FileText, Bot, User, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from 'react-markdown';
 
@@ -107,15 +107,15 @@ export function ChatInterface({ contractData, fullText }: ChatInterfaceProps) {
             className={`flex items-start gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
           >
             <div className={`mt-1 flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-transform hover:scale-110 ${msg.role === 'user'
-                ? 'bg-slate-900 text-white shadow-xl'
-                : 'bg-white border border-slate-200 shadow-md ring-1 ring-slate-100'
+              ? 'bg-slate-900 text-white shadow-xl'
+              : 'bg-white border border-slate-200 shadow-md ring-1 ring-slate-100'
               }`}>
               {msg.role === 'user' ? <User className="h-5 w-5" /> : <Bot className="h-5 w-5 text-blue-600" />}
             </div>
             <div
               className={`max-w-[85%] rounded-2xl px-6 py-4 shadow-sm transition-all animate-in fade-in slide-in-from-bottom-2 ${msg.role === 'user'
-                  ? 'bg-slate-900 text-white rounded-tr-none shadow-slate-200'
-                  : 'bg-white border border-slate-200 rounded-tl-none shadow-md text-slate-800'
+                ? 'bg-slate-900 text-white rounded-tr-none shadow-slate-200'
+                : 'bg-white border border-slate-200 rounded-tl-none shadow-md text-slate-800'
                 }`}
             >
               <div className="text-sm leading-relaxed font-medium">
