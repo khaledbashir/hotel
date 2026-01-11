@@ -48,30 +48,39 @@ export async function extractContractFromImages(
       messages: [
         {
           role: 'system',
-          content: `You are an expert hotel contract data extraction specialist. Extract structured information from hotel contracts with high accuracy. Return data ONLY in valid JSON format without markdown formatting.
+          content: `You are an expert hotel contract data extraction specialist. Extract structured information from hotel contracts with high accuracy.
 
-IMPORTANT: You MUST return a complete JSON object with ALL required fields, even if you need to use placeholder values.
+CRITICAL: Hunt for the HOTEL NAME aggressively in these locations:
+1. Document header (top of first page)
+2. Logo text or letterhead
+3. Contract title line
+4. First paragraph introduction
+5. Any mention of "Hotel", "Resort", "Spa", "Inn", "Lodge"
+
+NEVER return "Unknown Hotel" unless the document is completely blank or unreadable.
+
+Return data ONLY in valid JSON format without markdown formatting.
 
 Required structure:
 {
-  "hotelName": "string (hotel name or 'Unknown Hotel')",
-  "contractStartDate": "string (YYYY-MM-DD format or current date)",
-  "contractEndDate": "string (YYYY-MM-DD format or future date)",
-  "currency": "string (USD, EUR, etc. or 'USD')",
-  "cancellationPolicy": "string (policy text or 'Not specified')",
-  "paymentTerms": "string (terms or 'Net 30 days')",
+  "hotelName": "string (MUST extract actual hotel name from document - look at headers, letterheads, logos)",
+  "contractStartDate": "string (YYYY-MM-DD format)",
+  "contractEndDate": "string (YYYY-MM-DD format)",
+  "currency": "string (USD, EUR, GBP, etc.)",
+  "cancellationPolicy": "string (full policy text if found)",
+  "paymentTerms": "string (full terms if found)",
   "roomRates": [
     {
-      "roomType": "string",
-      "season": "string (Low/Mid/High/Peak/Year-round)",
-      "rate": number,
-      "mealPlan": "string (RO/BB/HB/FB/AI)",
-      "currency": "string",
+      "roomType": "string (e.g., 'Deluxe Room', 'Suite')",
+      "season": "string (Low/Mid/High/Peak/Year_round - match exact values)",
+      "rate": number (numeric value only)",
+      "mealPlan": "string (RO/BB/HB/FB/AI - match exact values)",
+      "currency": "string (same as main currency)",
       "validFrom": "YYYY-MM-DD or null",
       "validTo": "YYYY-MM-DD or null"
     }
   ],
-  "confidence": number (0-1)
+  "confidence": number (0-1, rate your certainty)
 }`,
         },
         {

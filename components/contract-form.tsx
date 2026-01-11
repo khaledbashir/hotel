@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Download, FileJson, FileSpreadsheet } from "lucide-react";
+import { Plus, Trash2, Download, FileJson, FileSpreadsheet, FileText } from "lucide-react";
 import { useContractStore } from "@/lib/store/contract-store";
 import type { HotelContract, RoomRate } from "@/lib/schemas/contract-schema";
 import { HotelContractSchema } from "@/lib/schemas/contract-schema";

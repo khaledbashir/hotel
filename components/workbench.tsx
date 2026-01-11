@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useContractStore } from "@/lib/store/contract-store";
-import { Loader2, FileText, MessageSquare, LayoutGrid } from "lucide-react";
+import { Loader2, FileText, MessageSquare, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Dynamically import PDFViewer to avoid server-side rendering issues
 const PDFViewer = dynamic(() => import('./pdf-viewer-simple').then(mod => mod.PDFViewer), {
@@ -38,8 +37,17 @@ const ChatInterface = dynamic(() => import('./chat-interface').then(mod => mod.C
 
 export function Workbench() {
   const { pdfFile, contract, isLoading } = useContractStore();
-  const [activeTab, setActiveTab] = useState('form');
   const [showPreview, setShowPreview] = useState(true);
+  const [showChat, setShowChat] = useState(false);
+
+  // Close chat on Escape key
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowChat(false);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
 
   if (isLoading) {
     return (
@@ -59,7 +67,7 @@ export function Workbench() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-12rem)] min-h-[750px]">
+    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-12rem)] min-h-[750px] relative">
       {/* Sidebar: PDF Viewer */}
       {showPreview && (
         <div className="w-full lg:w-[35%] xl:w-[30%] h-full flex flex-col shrink-0">
@@ -78,7 +86,7 @@ export function Workbench() {
         </div>
       )}
 
-      {/* Main Content: Form & Chat */}
+      {/* Main Content: Form Only */}
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${!showPreview ? 'max-w-4xl mx-auto w-full' : ''}`}>
         {!showPreview && (
           <div className="flex justify-end mb-3">
@@ -89,31 +97,61 @@ export function Workbench() {
           </div>
         )}
         
-        <div className="flex-1 flex flex-col bg-card rounded-xl border shadow-sm overflow-hidden">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            <div className="px-4 pt-4 border-b bg-muted/5">
-              <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
-                <TabsTrigger value="form" className="flex items-center gap-2 py-2">
-                  <LayoutGrid className="h-4 w-4" />
-                  Structured Data
-                </TabsTrigger>
-                <TabsTrigger value="chat" className="flex items-center gap-2 py-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Contract Intelligence
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent value="form" className="flex-1 m-0 p-4 overflow-auto focus-visible:outline-none">
-              <ContractForm />
-            </TabsContent>
-
-            <TabsContent value="chat" className="flex-1 m-0 p-0 overflow-hidden focus-visible:outline-none">
-              <ChatInterface contractData={contract} />
-            </TabsContent>
-          </Tabs>
+        <div className="flex-1 bg-card rounded-xl border shadow-sm overflow-hidden p-6">
+          <ContractForm />
         </div>
       </div>
+
+      {/* Floating Chat Toggle Button */}
+      <button
+        onClick={() => setShowChat(true)}
+        className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full p-4 shadow-2xl hover:scale-110 transition-all duration-300 group"
+      >
+        <Sparkles className="h-6 w-6" />
+        <span className="absolute right-full mr-3 bg-black/80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          Ask AI
+        </span>
+      </button>
+
+      {/* Slide-out Chat Panel */}
+      {showChat && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity"
+            onClick={() => setShowChat(false)}
+          />
+          
+          {/* Chat Panel */}
+          <div className="fixed right-0 top-0 h-full w-full max-w-lg bg-card shadow-2xl z-50 transform transition-transform duration-300 ease-in-out">
+            <div className="h-full flex flex-col">
+              {/* Chat Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="h-5 w-5" />
+                  <div>
+                    <h2 className="font-bold text-lg">Contract Intelligence</h2>
+                    <p className="text-xs text-white/80">Ask anything about your contract</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowChat(false)}
+                  className="text-white hover:bg-white/20"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {/* Chat Content */}
+              <div className="flex-1 overflow-hidden">
+                <ChatInterface contractData={contract} />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

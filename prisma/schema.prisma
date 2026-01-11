@@ -1,5 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Production Hotel Contract Intelligence Schema
+// Supports: Multi-format documents, multi-language, comprehensive contract terms
+// Author: Senior Systems Engineer
 
 generator client {
   provider = "prisma-client-js"
@@ -10,61 +11,712 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================================
+// ENUMS: Normalized business values across all contracts
+// ============================================================================
+
+enum FileType {
+  PDF
+  DOCX
+  DOC
+  PNG
+  JPG
+  JPEG
+  TIFF
+}
+
+enum ExtractionMethod {
+  TEXT_VISION
+  TEXT_PARSING
+  OCR
+  HYBRID
+  MANUAL
+}
+
+enum Language {
+  EN
+  ES
+  IT
+  DE
+  FR
+  PT
+  RU
+  AR
+  ZH
+  JA
+  KO
+}
+
 enum Season {
-  Low
-  Mid
-  High
-  Peak
-  Year_round
+  LOW_SEASON
+  MID_SEASON
+  SHOULDER_SEASON
+  HIGH_SEASON
+  PEAK_SEASON
+  CHRISTMAS_NEWYEAR
+  EASTER
+  YEAR_ROUND
 }
 
 enum MealPlan {
+  ROOM_ONLY
+  BREAKFAST_ONLY
+  HALF_BOARD
+  FULL_BOARD
+  ALL_INCLUSIVE
+  ULTRA_ALL_INCLUSIVE
+  BREAKFAST_PLUS_DINNER
+  BED_AND_BREAKFAST
+}
+
+enum BoardBasis {
   RO
   BB
   HB
   FB
   AI
+  UAI
+  BPD
 }
+
+enum RateType {
+  RACK_RATE
+  CORPORATE_RATE
+  NEGOTIATED_RATE
+  WHOLESALE_RATE
+  OTA_RATE
+  PROMOTIONAL_RATE
+  GROUP_RATE
+  NET_RATE
+}
+
+enum Currency {
+  USD
+  EUR
+  GBP
+  CHF
+  CAD
+  AUD
+  JPY
+  CNY
+  AED
+  SAR
+  EGP
+}
+
+enum RoomCategory {
+  STANDARD
+  SUPERIOR
+  DELUXE
+  SUITE
+  PRESIDENTIAL_SUITE
+  FAMILY_ROOM
+  STUDIO
+  APARTMENT
+  VILLA
+  BUNGALOW
+}
+
+enum AllotmentType {
+  GUARANTEED
+  ON_REQUEST
+  FREE_SALE
+}
+
+enum CommissionType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  NONE
+}
+
+enum CancellationPolicy {
+  NON_REFUNDABLE
+  FREE_CANCELLATION
+  PARTIAL_CANCELLATION
+  FLEXIBLE
+  CUSTOM
+}
+
+enum PaymentTerms {
+  NET_DAYS
+  PAYMENT_ON_ARRIVAL
+  DEPOSIT_REQUIRED
+  PRE_PAYMENT
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CREDIT_CARD
+  CHEQUE
+  CASH
+  DIRECT_DEBIT
+}
+
+enum CommissionPayment {
+  MONTHLY
+  QUARTERLY
+  UPON_PAYMENT
+  UPON_BOOKING
+  ANNUALLY
+}
+
+enum TaxType {
+  VAT
+  CITY_TAX
+  TOURISM_TAX
+  SERVICE_CHARGE
+  RESORT_FEE
+  BED_TAX
+}
+
+// ============================================================================
+// LAYER 1: RAW STORAGE (Append-only, full traceability)
+// ============================================================================
+
+model RawContractFile {
+  id          String   @id @default(cuid())
+  contractId  String   @map("contract_id") @unique
+  contract    Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  // Original file metadata
+  fileName    String   @map("file_name")
+  fileUrl     String?  @map("file_url")
+  fileSize    BigInt   @map("file_size")
+  fileType    FileType @map("file_type")
+  mimeType    String   @map("mime_type")
+  fileHash    String   @map("file_hash") @unique
+  
+  // Detection results
+  detectedLanguage Language @map("detected_language")
+  pageCount    Int?     @map("page_count")
+  
+  // OCR artifacts (for debugging/improvement)
+  ocrText     String?  @db.Text @map("ocr_text")
+  ocrConfidence Float?   @map("ocr_confidence")
+  layoutJson  Json?    @map("layout_json")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([fileHash])
+  @@index([detectedLanguage])
+  @@map("raw_contract_files")
+}
+
+model RawPage {
+  id          String   @id @default(cuid())
+  contractId  String   @map("contract_id")
+  contract    Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  pageNumber  Int      @map("page_number")
+  text        String?  @db.Text
+  tables      Json?    // Extracted tables from this page
+  layout      Json?    // Bounding boxes, text regions
+  ocrQuality  Float?   @map("ocr_quality")
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([contractId, pageNumber])
+  @@index([contractId])
+  @@map("raw_pages")
+}
+
+// ============================================================================
+// LAYER 2: CANONICAL JSON (Standardized, dynamic, versioned)
+// ============================================================================
+
+model CanonicalContract {
+  id            String   @id @default(cuid())
+  contractId    String   @map("contract_id") @unique
+  contract      Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  // Full canonical JSON (versioned)
+  jsonData     Json     @map("json_data") @db.JsonB
+  schemaVersion String   @map("schema_version") @default("v1.0.0")
+  
+  // Metadata
+  confidence    Float    @default(0.0)
+  extractedAt   DateTime @map("extracted_at")
+  llmModel     String?  @map("llm_model")
+  extractionPrompt String? @map("extraction_prompt")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([contractId])
+  @@index([confidence])
+  @@index([schemaVersion])
+  @@map("canonical_contracts")
+}
+
+// ============================================================================
+// EXTRACTION LOG: Audit trail for all extractions (observability)
+// ============================================================================
+
+model ExtractionLog {
+  id              String   @id @default(cuid())
+  contractId      String   @map("contract_id")
+  contract        Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  extractionType  String   @map("extraction_type") // full, incremental, re_extraction
+  method         ExtractionMethod
+  
+  // Metrics
+  durationMs      Int      @map("duration_ms")
+  confidenceScore Float    @map("confidence_score")
+  fieldsExtracted Int      @map("fields_extracted")
+  fieldsConfident Int      @map("fields_confident")
+  fieldsUncertain Int      @map("fields_uncertain")
+  
+  // Errors & Warnings
+  errors         Json?
+  warnings       Json?
+  
+  // Version
+  version        String   @map("version") // contract version hash
+  previousVersion String?  @map("previous_version")
+  
+  // Metadata
+  ipAddress      String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  
+  createdAt      DateTime @default(now())
+  
+  @@index([contractId, createdAt])
+  @@map("extraction_logs")
+}
+
+// ============================================================================
+// CORE CONTRACT ENTITY
+// ============================================================================
 
 model Contract {
-  id                String   @id @default(cuid())
-  hotelName         String   @map("hotel_name")
-  fileName          String   @map("file_name")
-  fileUrl           String?  @map("file_url")
-  fileHash          String?  @map("file_hash") @unique
-  fileType          String   @map("file_type") // pdf, excel, word
-  contractStartDate  DateTime @map("contract_start_date")
-  contractEndDate    DateTime @map("contract_end_date")
-  currency          String   @default("USD") @db.VarChar(3)
-  cancellationPolicy String?  @map("cancellation_policy")
-  paymentTerms      String?  @map("payment_terms")
-  extractionMethod   String   @map("extraction_method") // vision, text, hybrid
-  confidence        Float?   @default(0.0)
-  extractedAt       DateTime @map("extracted_at") @default(now())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  roomRates        RoomRate[]
+  id                  String           @id @default(cuid())
+  
+  // Document Metadata
+  fileName            String           @map("file_name")
+  fileType            FileType
+  fileSize            BigInt           @map("file_size")
+  fileHash            String?          @map("file_hash") @unique
+  fileUrl             String?          @map("file_url")
+  language            Language         @default(EN)
+  extractionMethod    ExtractionMethod @map("extraction_method")
+  extractionDurationMs Int?             @map("extraction_duration_ms")
+  extractionConfidence Float?           @map("extraction_confidence")
+  
+  // Raw extraction for audit/debug
+  rawExtraction       Json?            @map("raw_extraction")
+  
+  // Contract Dates
+  contractStartDate   DateTime         @map("contract_start_date")
+  contractEndDate     DateTime         @map("contract_end_date")
+  signingDate        DateTime?        @map("signing_date")
+  renewalDate        DateTime?        @map("renewal_date")
+  
+  // Parties
+  hotelName          String           @map("hotel_name")
+  hotelAddress       String?          @map("hotel_address")
+  hotelCity          String?          @map("hotel_city")
+  hotelCountry       String?          @map("hotel_country")
+  hotelContact       String?          @map("hotel_contact")
+  hotelEmail         String?          @map("hotel_email")
+  hotelPhone         String?          @map("hotel_phone")
+  
+  agentName          String?          @map("agent_name")
+  agentCompanyName   String?          @map("agent_company_name")
+  agentContact       String?          @map("agent_contact")
+  agentEmail         String?          @map("agent_email")
+  
+  // Financial Terms
+  baseCurrency       Currency         @default(USD) @map("base_currency")
+  vatIncluded        Boolean          @default(false) @map("vat_included")
+  vatRate           Float?           @map("vat_rate")
+  taxesIncluded      Boolean          @default(false) @map("taxes_included")
+  serviceCharge      Float?           @map("service_charge")
+  resortFee          Float?           @map("resort_fee")
+  
+  // Commission & Payment
+  commissionType     CommissionType   @map("commission_type")
+  commissionRate     Float?           @map("commission_rate")
+  commissionPayment  CommissionPayment @map("commission_payment")
+  paymentTerms       PaymentTerms     @map("payment_terms")
+  paymentDays        Int?             @map("payment_days")
+  paymentMethod     PaymentMethod?    @map("payment_method")
+  depositRequired    Float?           @map("deposit_required")
+  depositPercentage  Float?           @map("deposit_percentage")
+  
+  // Cancellation & No-Show
+  cancellationPolicy CancellationPolicy @map("cancellation_policy")
+  freeCancellationHours Int?           @map("free_cancellation_hours")
+  noShowPolicy       String?          @map("no_show_policy")
+  noShowCharge      Float?           @map("no_show_charge")
+  earlyDepartureCharge Float?         @map("early_departure_charge")
+  
+  // Allotment & Release
+  allotmentType      AllotmentType    @map("allotment_type")
+  totalAllotment    Int?             @map("total_allotment")
+  releasePeriodDays  Int?             @map("release_period_days")
+  releasePeriodHours Int?             @map("release_period_hours")
+  overbookingAllowed Boolean          @default(false) @map("overbooking_allowed")
+  overbookingPercentage Float?         @map("overbooking_percentage")
+  
+  // Additional Terms
+  specialConditions  Json?            @map("special_conditions")
+  restrictions      Json?            @map("restrictions")
+  blackouts         Json?            @map("blackouts")
+  minimumStayNights Int?             @map("minimum_stay_nights")
+  maximumStayNights Int?             @map("maximum_stay_nights")
+  checkInTime       String?          @map("check_in_time")
+  checkOutTime      String?          @map("check_out_time")
+  
+  // Validation Status
+  validationStatus   String           @default("pending") @map("validation_status") // pending, validated, rejected, needs_review
+  validationErrors  Json?            @map("validation_errors")
+  manualReviewRequired Boolean          @default(false) @map("manual_review_required")
+  
+  // Observability
+  extractedAt        DateTime         @map("extracted_at") @default(now())
+  validatedAt        DateTime?        @map("validated_at")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  
+  // Relations
+  rawFile            RawContractFile?
+  rawPages           RawPage[]
+  canonicalData       CanonicalContract?
+  roomRates          RoomRate[]
+  seasonalRates      SeasonalRate[]
+  blackoutDates      BlackoutDate[]
+  taxes              Tax[]
+  supplements        Supplement[]
+  childrenPolicy      ChildrenPolicy?
+  groupsPolicy       GroupsPolicy?
+  extractionLogs      ExtractionLog[]
+  
+  // Uncertainty tracking
+  uncertainFields   UncertainField[]
+  rawClauses        RawClause[]
   
   @@index([hotelName, contractStartDate, contractEndDate])
+  @@index([extractionConfidence])
+  @@index([validationStatus])
   @@index([createdAt])
+  @@map("contracts")
 }
 
-model RoomRate {
-  id           String   @id @default(cuid())
-  contractId   String   @map("contract_id")
-  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  roomType     String   @map("room_type")
-  season       Season
-  rate         Float
-  mealPlan     MealPlan @map("meal_plan")
-  currency      String   @default("USD") @db.VarChar(3)
-  validFrom    DateTime? @map("valid_from")
-  validTo      DateTime? @map("valid_to")
-  confidence   Float?   @default(0.0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+// ============================================================================
+// ROOM RATES: Core pricing by room type, season, meal plan
+// ============================================================================
 
+model RoomRate {
+  id               String       @id @default(cuid())
+  contractId       String       @map("contract_id")
+  contract         Contract     @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  roomType         String       @map("room_type")
+  roomCategory     RoomCategory @map("room_category")
+  season           Season
+  rateType         RateType     @map("rate_type")
+  
+  baseRate         Float        @map("base_rate")
+  currency         Currency
+  mealPlan         MealPlan     @map("meal_plan")
+  boardBasis       BoardBasis?   @map("board_basis")
+  
+  // Validity Period
+  validFrom        DateTime?    @map("valid_from")
+  validTo          DateTime?    @map("valid_to")
+  
+  // Occupancy
+  singleOccupancyRate  Float?    @map("single_occupancy_rate")
+  doubleOccupancyRate  Float?    @map("double_occupancy_rate")
+  tripleOccupancyRate  Float?    @map("triple_occupancy_rate")
+  quadOccupancyRate    Float?    @map("quad_occupancy_rate")
+  childRate              Float?    @map("child_rate")
+  adultExtraRate         Float?    @map("adult_extra_rate")
+  
+  // Allotment for this rate
+  allotment       Int?         @map("allotment")
+  releaseDays     Int?         @map("release_days")
+  minimumStay     Int?         @map("minimum_stay")
+  maximumStay     Int?         @map("maximum_stay")
+  
+  // Confidence & Validation
+  extractionConfidence Float?    @map("extraction_confidence")
+  isManualEdit     Boolean      @default(false) @map("is_manual_edit")
+  
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  
   @@index([contractId, season, roomType])
-  @@index([rate])
+  @@index([baseRate])
+  @@index([validFrom, validTo])
+  @@map("room_rates")
+}
+
+// ============================================================================
+// SEASONAL RATES: Flexible date-based pricing
+// ============================================================================
+
+model SeasonalRate {
+  id               String     @id @default(cuid())
+  contractId       String     @map("contract_id")
+  contract         Contract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  name             String
+  description      String?
+  
+  season           Season
+  startDate        DateTime   @map("start_date")
+  endDate          DateTime   @map("end_date")
+  
+  // Multiplier from base rate
+  multiplier       Float      @default(1.0)
+  fixedAdjustment  Float?     @map("fixed_adjustment")
+  
+  // Applicability
+  appliesToRoomTypes Json?      @map("applies_to_room_types")
+  
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  
+  @@index([contractId, startDate, endDate])
+  @@map("seasonal_rates")
+}
+
+// ============================================================================
+// BLACKOUT DATES: Periods when bookings are not allowed
+// ============================================================================
+
+model BlackoutDate {
+  id            String   @id @default(cuid())
+  contractId    String   @map("contract_id")
+  contract      Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  startDate     DateTime @map("start_date")
+  endDate       DateTime @map("end_date")
+  reason        String?
+  
+  // Applicability
+  appliesToRoomTypes Json?   @map("applies_to_room_types")
+  appliesToRateTypes Json?   @map("applies_to_rate_types")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([contractId, startDate, endDate])
+  @@map("blackout_dates")
+}
+
+// ============================================================================
+// TAXES & SURCHARGES: Mandatory fees
+// ============================================================================
+
+model Tax {
+  id          String   @id @default(cuid())
+  contractId  String   @map("contract_id")
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  type        TaxType
+  name        String
+  rate        Float
+  currency    Currency
+  
+  // Calculation
+  perPerson   Boolean? @default(false) @map("per_person")
+  perNight    Boolean? @default(false) @map("per_night")
+  percentage  Boolean? @default(false)
+  minAmount   Float?   @map("min_amount")
+  maxAmount   Float?   @map("max_amount")
+  
+  // Applicability
+  appliesToRoomTypes Json? @map("applies_to_room_types")
+  appliesToSeasons   Json? @map("applies_to_seasons")
+  
+  mandatory   Boolean  @default(true)
+  description String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([contractId, type])
+  @@map("taxes")
+}
+
+// ============================================================================
+// SUPPLEMENTS: Optional extra charges (meals, transfers, etc.)
+// ============================================================================
+
+model Supplement {
+  id          String   @id @default(cuid())
+  contractId  String   @map("contract_id")
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  name        String
+  type        String   // meal_upgrade, transfer, excursion, etc.
+  description String?
+  
+  baseRate    Float    @map("base_rate")
+  currency    Currency
+  perPerson   Boolean? @default(false) @map("per_person")
+  perNight    Boolean? @default(false) @map("per_night")
+  perUnit     Boolean? @default(false) @map("per_unit")
+  
+  // Applicability
+  appliesToRoomTypes Json? @map("applies_to_room_types")
+  appliesToMealPlans  Json? @map("applies_to_meal_plans")
+  
+  mandatory   Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([contractId, type])
+  @@map("supplements")
+}
+
+// ============================================================================
+// CHILDREN POLICY: Age-based pricing and restrictions
+// ============================================================================
+
+model ChildrenPolicy {
+  id                  String   @id @default(cuid())
+  contractId          String   @map("contract_id") @unique
+  contract            Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  maxChildAge         Int      @map("max_child_age") // e.g., 12 years
+  minChildAge         Int?     @map("min_child_age") // e.g., 2 years
+  
+  // Pricing tiers
+  infantRatePercent   Float?   @map("infant_rate_percent") // 0-2 years, % of adult rate
+  childRatePercent    Float?   @map("child_rate_percent")   // 3-12 years, % of adult rate
+  teenRatePercent    Float?   @map("teen_rate_percent")    // 13-17 years, % of adult rate
+  
+  infantMaxFree      Int?     @map("infant_max_free")   // free infants per room
+  childMaxFree       Int?     @map("child_max_free")    // free children per room
+  
+  // Bedding
+  sharingBedAllowed   Boolean? @default(true) @map("sharing_bed_allowed")
+  extraBedRequired   Boolean? @default(false) @map("extra_bed_required")
+  extraBedCharge     Float?   @map("extra_bed_charge")
+  
+  // Restrictions
+  maxChildrenPerRoom Int?     @map("max_children_per_room")
+  childrenAloneAllowed Boolean? @default(false) @map("children_alone_allowed")
+  
+  description         String?
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  @@map("children_policies")
+}
+
+// ============================================================================
+// GROUPS POLICY: Minimum numbers, deposits, restrictions
+// ============================================================================
+
+model GroupsPolicy {
+  id                  String   @id @default(cuid())
+  contractId          String   @map("contract_id") @unique
+  contract            Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  minGroupSize        Int      @map("min_group_size")
+  maxGroupSize        Int?     @map("max_group_size")
+  
+  // Group deposits
+  groupDepositRequired Boolean? @default(false) @map("group_deposit_required")
+  groupDepositPercent Float?   @map("group_deposit_percent")
+  depositDeadlineDays Int?    @map("deposit_deadline_days")
+  
+  // Payment terms for groups
+  paymentTermsGroups String?   @map("payment_terms_groups")
+  finalPaymentDays    Int?     @map("final_payment_days")
+  
+  // Restrictions
+  blackoutDuringGroup  Boolean? @default(false) @map("blackout_during_group")
+  blackoutPeriodDays  Int?     @map("blackout_period_days")
+  
+  // Commissions
+  commissionOverrideRate Float? @map("commission_override_rate")
+  
+  description         String?
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  @@map("groups_policies")
+}
+
+// ============================================================================
+// UNCERTAIN FIELDS: Fields where LLM had low confidence
+// ============================================================================
+
+model UncertainField {
+  id          String   @id @default(cuid())
+  contractId  String   @map("contract_id")
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  // Field identification
+  fieldPath   String   @map("field_path") // e.g., "rates.0.price", "allotments.1.releaseDays"
+  fieldName   String   @map("field_name")
+  fieldType   String?  @map("field_type")
+  
+  // Uncertainty details
+  reason      String   // Why uncertain (e.g., "ambiguous currency", "conflicting values")
+  confidence  Float?   @default(0.0)
+  
+  // Alternative values found
+  alternatives Json?    // [{ value: 120, confidence: 0.6 }, { value: 125, confidence: 0.4 }]
+  
+  // Resolution
+  isResolved  Boolean? @default(false) @map("is_resolved")
+  resolvedValue String?  @map("resolved_value")
+  resolvedBy   String?  @map("resolved_by") // user, system, manual
+  
+  // Context
+  contextText String?  @map("context_text") // Surrounding text for manual review
+  pageNumber   Int?     @map("page_number")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([contractId, confidence])
+  @@index([isResolved])
+  @@map("uncertain_fields")
+}
+
+// ============================================================================
+// RAW CLAUSES: Free-form contract text for reference
+// ============================================================================
+
+model RawClause {
+  id          String   @id @default(cuid())
+  contractId  String   @map("contract_id")
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  // Clause identification
+  label       String   // e.g., "earlyCheckin", "lateCheckout", "paymentTerms"
+  category    String?  // commercial, legal, operational, cancellation, etc.
+  
+  // Raw text content
+  text        String   @db.Text
+  pageNumber  Int?     @map("page_number")
+  
+  // Optional structure
+  extractedData Json?    @map("extracted_data")
+  
+  // Relevance
+  importance  Float?   @default(0.5) // 0-1 for prioritization
+  tags        String[] // ["cancellation", "payment", "checkin"]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([contractId, label])
+  @@index([category])
+  @@map("raw_clauses")
 }

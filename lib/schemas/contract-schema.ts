@@ -7,11 +7,9 @@ import { z } from "zod";
 
 export const RoomRateSchema = z.object({
   roomType: z.string().min(1, "Room type is required"),
-  season: z.enum(["Low", "Mid", "High", "Peak", "Year-round"]),
+  season: z.enum(["Low", "Mid", "High", "Peak", "Year_round"]),
   rate: z.number().positive("Rate must be positive"),
-  mealPlan: z.enum(["RO", "BB", "HB", "FB", "AI"], {
-    description: "Room Only, Bed & Breakfast, Half Board, Full Board, All Inclusive",
-  }),
+  mealPlan: z.enum(["RO", "BB", "HB", "FB", "AI"]),
   currency: z.string().default("USD"),
   validFrom: z.string().optional(),
   validTo: z.string().optional(),
@@ -85,7 +83,7 @@ export const mockContractData: HotelContract = {
     },
     {
       roomType: "Presidential Suite",
-      season: "Year-round",
+      season: "Year_round",
       rate: 890,
       mealPlan: "AI",
       currency: "EUR",
