@@ -1,26 +1,7 @@
-// Modern multi-format extraction
+// Modern multi-format extraction using unpdf (lightweight, no DOM dependencies)
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
-
-// Polyfill DOMMatrix and related APIs for legacy PDF libraries in Node environment
-if (typeof global !== 'undefined') {
-  if (!(global as any).DOMMatrix) {
-    (global as any).DOMMatrix = class DOMMatrix {
-      constructor() {}
-      static fromFloat32Array() { return new DOMMatrix(); }
-      static fromFloat64Array() { return new DOMMatrix(); }
-      translate() { return this; }
-      scale() { return this; }
-      rotate() { return this; }
-    };
-  }
-  if (!(global as any).Path2D) {
-    (global as any).Path2D = class Path2D {};
-  }
-  if (!(global as any).ImageData) {
-    (global as any).ImageData = class ImageData {};
-  }
-}
+import { extractText } from 'unpdf';
 
 export type FileType = 'pdf' | 'excel' | 'word';
 
@@ -33,20 +14,15 @@ export interface ExtractedData {
 
 export async function extractPDF(buffer: Buffer): Promise<ExtractedData> {
   try {
-    const pdfParseModule = require('pdf-parse');
-    // pdf-parse exports default in some builds, need to handle both cases
-    const pdfParse = pdfParseModule.default || pdfParseModule;
-    const data = await pdfParse(buffer);
-    const extractedText = data.text || "";
-    console.log(`[PDF Extraction] Extracted ${extractedText.length} characters from ${data.numpages} pages`);
+    const { text, totalPages } = await extractText(buffer);
+    console.log(`[PDF Extraction] Extracted ${text.length} characters from ${totalPages} pages`);
     return {
       fileType: 'pdf',
-      text: extractedText,
-      pages: data.numpages,
+      text: text || "",
+      pages: totalPages,
     };
   } catch (err) {
     console.error("PDF Extraction Error:", err);
-    // Return empty but don't crash - let the caller decide what to do
     return {
       fileType: 'pdf',
       text: "",
