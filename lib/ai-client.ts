@@ -48,7 +48,31 @@ export async function extractContractFromImages(
       messages: [
         {
           role: 'system',
-          content: 'You are an expert hotel contract data extraction specialist. Extract structured information from hotel contracts with high accuracy. Return data ONLY in JSON format.',
+          content: `You are an expert hotel contract data extraction specialist. Extract structured information from hotel contracts with high accuracy. Return data ONLY in valid JSON format without markdown formatting.
+
+IMPORTANT: You MUST return a complete JSON object with ALL required fields, even if you need to use placeholder values.
+
+Required structure:
+{
+  "hotelName": "string (hotel name or 'Unknown Hotel')",
+  "contractStartDate": "string (YYYY-MM-DD format or current date)",
+  "contractEndDate": "string (YYYY-MM-DD format or future date)",
+  "currency": "string (USD, EUR, etc. or 'USD')",
+  "cancellationPolicy": "string (policy text or 'Not specified')",
+  "paymentTerms": "string (terms or 'Net 30 days')",
+  "roomRates": [
+    {
+      "roomType": "string",
+      "season": "string (Low/Mid/High/Peak/Year-round)",
+      "rate": number,
+      "mealPlan": "string (RO/BB/HB/FB/AI)",
+      "currency": "string",
+      "validFrom": "YYYY-MM-DD or null",
+      "validTo": "YYYY-MM-DD or null"
+    }
+  ],
+  "confidence": number (0-1)
+}`,
         },
         {
           role: 'user',
@@ -102,7 +126,21 @@ export async function extractContractFromText(
       messages: [
         {
           role: 'system',
-          content: 'You are an expert hotel contract analyst. Extract data in JSON format.',
+          content: `You are an expert hotel contract analyst. Extract data in valid JSON format without markdown formatting.
+
+CRITICAL: Always return a complete JSON object with ALL required fields. Use placeholder values if information is missing.
+
+Required JSON structure:
+{
+  "hotelName": "string",
+  "contractStartDate": "YYYY-MM-DD",
+  "contractEndDate": "YYYY-MM-DD",
+  "currency": "USD",
+  "cancellationPolicy": "string",
+  "paymentTerms": "string",
+  "roomRates": [],
+  "confidence": 0.5
+}`,
         },
         {
           role: 'user',

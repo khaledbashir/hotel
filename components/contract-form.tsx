@@ -64,7 +64,8 @@ export function ContractForm() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${localContract.hotelName.replace(/\s+/g, "_")}_contract.json`;
+      const hotelName = localContract?.hotelName || "contract";
+      a.download = `${hotelName.replace(/\s+/g, "_")}_contract.json`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Contract exported as JSON");
@@ -74,6 +75,10 @@ export function ContractForm() {
   };
 
   const exportToCSV = () => {
+    if (!localContract || !localContract.roomRates || localContract.roomRates.length === 0) {
+      toast.error("No room rates to export");
+      return;
+    }
     const headers = ["Room Type", "Season", "Rate", "Currency", "Meal Plan", "Valid From", "Valid To"];
     const rows = localContract.roomRates.map((rate) => [
       rate.roomType,
@@ -90,11 +95,24 @@ export function ContractForm() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${localContract.hotelName.replace(/\s+/g, "_")}_rates.csv`;
+    const hotelName = localContract?.hotelName || "contract";
+    a.download = `${hotelName.replace(/\s+/g, "_")}_rates.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Rates exported as CSV");
   };
+
+  if (!localContract || Object.keys(localContract).length === 0) {
+    return (
+      <Card className="h-full overflow-auto flex items-center justify-center">
+        <div className="text-center text-muted-foreground py-12">
+          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p className="text-lg font-semibold">No Contract Data</p>
+          <p className="text-sm mt-2">Upload a document to extract contract information</p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="h-full overflow-auto">
