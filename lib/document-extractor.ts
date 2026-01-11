@@ -1,7 +1,9 @@
 // Real multi-format extraction - no toys
-import pdfParse from 'pdf-parse';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
+
+// Use require for pdf-parse as it's a CJS module that has issues with ESM default exports in Turbopack
+const pdfParse = require('pdf-parse');
 
 export type FileType = 'pdf' | 'excel' | 'word';
 
