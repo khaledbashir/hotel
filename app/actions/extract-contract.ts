@@ -26,16 +26,18 @@ export async function extractContractData(formData: FormData) {
     let result;
     
     // Step 2: Use text-based extraction for documents (PDF/Word/Excel)
-    // The previous vision-first approach for PDFs triggered "Image format error" on the API
-    if (extraction.text && extraction.text.trim().length > 50) {
+    if (extraction.text && extraction.text.trim().length > 20) {
       console.log('[extractContractData] Using text extraction...');
       result = await extractContractFromText(extraction.text);
-    } else {
-      // Last resort: try vision (only if file size is reasonable)
-      console.log('[extractContractData] Falling back to vision extraction...');
+    } else if (file.type.startsWith('image/')) {
+      // Only use vision if it's an actual image format
+      console.log('[extractContractData] Using vision extraction for image...');
       const base64 = buffer.toString('base64');
       const imageDataUrl = `data:${file.type};base64,${base64}`;
       result = await extractContractFromImages([imageDataUrl]);
+    } else {
+      // If we're here, text extraction failed and it's not an image
+      throw new Error('Could not extract text from this document. Please ensure it is not a scanned image PDF without OCR.');
     }
     
     // Step 3: Save to Database (Production Ready)
