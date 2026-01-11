@@ -127,6 +127,7 @@ export async function extractContractData(formData: FormData) {
         extractedAt: new Date().toISOString(),
         confidence: result.confidence || 0.85,
         dbId: savedContractId,
+        fullText: extraction.text,
       }
     };
   } catch (error) {

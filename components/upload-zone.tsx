@@ -56,6 +56,7 @@ export function UploadZone() {
           console.log('[UploadZone] Extraction successful');
           // Update store with extracted data
           useContractStore.getState().setContract(result.data);
+          useContractStore.getState().setFullText(result.data.fullText);
           toast.success("Contract extracted successfully!");
         }
       } catch (error) {
@@ -92,8 +93,8 @@ export function UploadZone() {
   return (
     <Card
       className={`relative border-2 border-dashed transition-all duration-200 ${isDragging
-          ? "border-primary bg-primary/5 scale-[1.02]"
-          : "border-muted-foreground/25 hover:border-primary/50"
+        ? "border-primary bg-primary/5 scale-[1.02]"
+        : "border-muted-foreground/25 hover:border-primary/50"
         }`}
       onDragOver={(e) => {
         e.preventDefault();

@@ -3,12 +3,20 @@ import { ZAI_BASE_URL, ZAI_API_KEY, ZAI_MODEL } from '@/lib/ai-client';
 
 export async function POST(request: NextRequest) {
   try {
-    const { question, contractData } = await request.json();
+    const { question, contractData, fullText } = await request.json();
 
-    const systemPrompt = `You are an expert hotel contract analyst. Answer questions about hotel contracts based on the provided data. Be specific and cite exact values from the contract data. If information is not available, say so clearly.
+    const systemPrompt = `You are an expert hotel contract analyst. Answer questions about hotel contracts based on the provided structured data AND the full document text. 
 
-Contract Data:
-${JSON.stringify(contractData, null, 2)}`;
+Be specific and cite exact values or clauses. If information is not available, say so clearly.
+
+---
+STRUCTURED CONTRACT DATA (JSON):
+${JSON.stringify(contractData, null, 2)}
+
+---
+FULL DOCUMENT TEXT CONTEXT (EXTRACTED):
+${(fullText || "").slice(0, 20000)}
+---`;
 
     const response = await fetch(`${ZAI_BASE_URL}/chat/completions`, {
       method: 'POST',
