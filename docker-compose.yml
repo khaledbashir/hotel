@@ -6,6 +6,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ZAI_API_KEY=${ZAI_API_KEY}
+      - ZAI_BASE_URL=${ZAI_BASE_URL}
+      - ZAI_MODEL=${ZAI_MODEL}
+      - DATABASE_URL=${DATABASE_URL}
       - NODE_ENV=production
     restart: unless-stopped
