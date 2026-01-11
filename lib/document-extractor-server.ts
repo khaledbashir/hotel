@@ -1,6 +1,9 @@
-// Modern multi-format extraction
+// Server-only multi-format extraction
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
+
+// Use require for pdf-parse to avoid ESM/CJS default export conflicts
+const pdfParse = require('pdf-parse');
 
 export type FileType = 'pdf' | 'excel' | 'word';
 
@@ -11,26 +14,16 @@ export interface ExtractedData {
   tables?: any[];
 }
 
-// Modern PDF extraction using pdf-lib (no DOM polyfills needed)
 export async function extractPDF(buffer: Buffer): Promise<ExtractedData> {
-  // We'll use a safer approach for PDF text extraction that doesn't trigger DOMMatrix errors
-  // pdf-parse is legacy; we'll wrap it in a try-catch and provide a cleaner interface
-  try {
-    const pdfParse = require('pdf-parse');
-    const data = await pdfParse(buffer);
-    return {
-      fileType: 'pdf',
-      text: data.text || "PDF content could not be read as text. Please ensure it is not an image-only PDF.",
-      pages: data.numpages,
-    };
-  } catch (err) {
-    console.error("PDF Extraction Error:", err);
-    return {
-      fileType: 'pdf',
-      text: "Error reading PDF text.",
-      pages: 0
-    };
-  }
+  // pdf-parse uses some legacy APIs that might trigger DOMMatrix warnings in some Node environments
+  // but it's the most reliable simple extractor for standard PDFs
+  const data = await pdfParse(buffer);
+  
+  return {
+    fileType: 'pdf',
+    text: data.text,
+    pages: data.numpages,
+  };
 }
 
 export async function extractExcel(buffer: Buffer): Promise<ExtractedData> {
