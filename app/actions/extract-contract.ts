@@ -68,6 +68,7 @@ export async function extractContractData(formData: FormData) {
     
     return {
       ...result,
+      roomRates: result.roomRates || [],
       extractedAt: new Date().toISOString(),
       confidence: result.confidence || 0.85,
     };

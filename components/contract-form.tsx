@@ -199,7 +199,7 @@ export function ContractForm() {
             </Button>
           </div>
 
-          {localContract.roomRates.map((rate, index) => (
+          {(localContract?.roomRates || []).map((rate, index) => (
             <Card key={index} className="p-4 bg-muted/30">
               <div className="flex items-start justify-between mb-4">
                 <span className="text-sm font-medium text-muted-foreground">Rate #{index + 1}</span>

@@ -73,7 +73,12 @@ export async function extractContractFromImages(
   const jsonContent = content.replace(/ \`\`\`json/g, '').replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
   
   try {
-    return JSON.parse(jsonContent);
+    const parsed = JSON.parse(jsonContent);
+    // Ensure roomRates exists
+    return {
+      ...parsed,
+      roomRates: parsed.roomRates || [],
+    };
   } catch (e) {
     throw new Error('AI returned invalid JSON format from vision model.');
   }
@@ -114,7 +119,12 @@ export async function extractContractFromText(
   const jsonContent = content.replace(/ \`\`\`json/g, '').replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
   
   try {
-    return JSON.parse(jsonContent);
+    const parsed = JSON.parse(jsonContent);
+    // Ensure roomRates exists
+    return {
+      ...parsed,
+      roomRates: parsed.roomRates || [],
+    };
   } catch (e) {
     throw new Error('AI returned invalid JSON format from text model.');
   }
