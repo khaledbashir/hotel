@@ -92,10 +92,27 @@ export function UploadZone() {
       }`}
       onDragOver={(e) => {
         e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
         setIsDragging(true);
       }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={handleDrop}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+      }}
+      onDragLeave={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file) handleFile(file);
+      }}
     >
       <label
         htmlFor="file-upload"
@@ -106,16 +123,16 @@ export function UploadZone() {
         </div>
         <h3 className="text-xl font-semibold mb-2">Upload Hotel Contract</h3>
         <p className="text-sm text-muted-foreground text-center mb-4">
-          Drag and drop your PDF or DOCX file here, or click to browse
+          Drag and drop your PDF, Word, or Excel file here, or click to browse
         </p>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <FileText className="h-4 w-4" />
-          <span>Supports PDF and DOCX up to 10MB</span>
+          <span>Supports PDF, DOCX, XLSX up to 10MB</span>
         </div>
         <input
           id="file-upload"
           type="file"
-          accept=".pdf,.docx"
+          accept=".pdf,.docx,.xlsx,.xls,.csv"
           onChange={handleChange}
           className="hidden"
         />
