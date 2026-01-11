@@ -28,8 +28,15 @@ export async function extractContractData(formData: FormData) {
       console.log(`[extractContractData] Text sample: ${extraction.text.substring(0, 200)}...`);
     }
     
-    // Step 2: Use text-based extraction for documents (PDF/Word/Excel)
-    if (extraction.text && extraction.text.trim().length > 20) {
+    let result;
+
+    // Step 2: Extract data using AI
+    if (file.type.startsWith('image/')) {
+      console.log('[extractContractData] Using image vision extraction...');
+      const base64 = buffer.toString('base64');
+      const imageUrl = `data:${file.type};base64,${base64}`;
+      result = await extractContractFromImages([imageUrl]);
+    } else if (extraction.text && extraction.text.trim().length > 20) {
       console.log(`[extractContractData] Using text extraction (${extraction.text.length} chars)...`);
       result = await extractContractFromText(extraction.text);
     } else {

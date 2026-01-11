@@ -14,7 +14,9 @@ export interface ExtractedData {
 
 export async function extractPDF(buffer: Buffer): Promise<ExtractedData> {
   try {
-    const { text, totalPages } = await extractText(buffer);
+    // Convert Buffer to Uint8Array for unpdf compatibility
+    const uint8Array = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    const { text, totalPages } = await extractText(uint8Array);
     console.log(`[PDF Extraction] Extracted ${text.length} characters from ${totalPages} pages`);
     return {
       fileType: 'pdf',
