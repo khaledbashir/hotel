@@ -33,7 +33,9 @@ export interface ExtractedData {
 
 export async function extractPDF(buffer: Buffer): Promise<ExtractedData> {
   try {
-    const pdfParse = require('pdf-parse');
+    const pdfParseModule = require('pdf-parse');
+    // pdf-parse exports default in some builds, need to handle both cases
+    const pdfParse = pdfParseModule.default || pdfParseModule;
     const data = await pdfParse(buffer);
     const extractedText = data.text || "";
     console.log(`[PDF Extraction] Extracted ${extractedText.length} characters from ${data.numpages} pages`);
