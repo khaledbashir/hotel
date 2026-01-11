@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  hotel-contract-intelligence:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - NODE_ENV=production
+    restart: unless-stopped

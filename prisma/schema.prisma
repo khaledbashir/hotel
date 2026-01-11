@@ -1,0 +1,70 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Season {
+  Low
+  Mid
+  High
+  Peak
+  Year_round
+}
+
+enum MealPlan {
+  RO
+  BB
+  HB
+  FB
+  AI
+}
+
+model Contract {
+  id                String   @id @default(cuid())
+  hotelName         String   @map("hotel_name")
+  fileName          String   @map("file_name")
+  fileUrl           String?  @map("file_url")
+  fileHash          String?  @map("file_hash") @unique
+  fileType          String   @map("file_type") // pdf, excel, word
+  contractStartDate  DateTime @map("contract_start_date")
+  contractEndDate    DateTime @map("contract_end_date")
+  currency          String   @default("USD") @db.VarChar(3)
+  cancellationPolicy String?  @map("cancellation_policy")
+  paymentTerms      String?  @map("payment_terms")
+  extractionMethod   String   @map("extraction_method") // vision, text, hybrid
+  confidence        Float?   @default(0.0)
+  extractedAt       DateTime @map("extracted_at") @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  roomRates        RoomRate[]
+  
+  @@index([hotelName, contractStartDate, contractEndDate])
+  @@index([createdAt])
+}
+
+model RoomRate {
+  id           String   @id @default(cuid())
+  contractId   String   @map("contract_id")
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  roomType     String   @map("room_type")
+  season       Season
+  rate         Float
+  mealPlan     MealPlan @map("meal_plan")
+  currency      String   @default("USD") @db.VarChar(3)
+  validFrom    DateTime? @map("valid_from")
+  validTo      DateTime? @map("valid_to")
+  confidence   Float?   @default(0.0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([contractId, season, roomType])
+  @@index([rate])
+}
