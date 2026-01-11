@@ -2,13 +2,24 @@
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
 
-// Polyfill DOMMatrix for legacy PDF libraries in Node environment
-if (typeof global !== 'undefined' && !(global as any).DOMMatrix) {
-  (global as any).DOMMatrix = class DOMMatrix {
-    constructor() {}
-    static fromFloat32Array() { return new DOMMatrix(); }
-    static fromFloat64Array() { return new DOMMatrix(); }
-  };
+// Polyfill DOMMatrix and related APIs for legacy PDF libraries in Node environment
+if (typeof global !== 'undefined') {
+  if (!(global as any).DOMMatrix) {
+    (global as any).DOMMatrix = class DOMMatrix {
+      constructor() {}
+      static fromFloat32Array() { return new DOMMatrix(); }
+      static fromFloat64Array() { return new DOMMatrix(); }
+      translate() { return this; }
+      scale() { return this; }
+      rotate() { return this; }
+    };
+  }
+  if (!(global as any).Path2D) {
+    (global as any).Path2D = class Path2D {};
+  }
+  if (!(global as any).ImageData) {
+    (global as any).ImageData = class ImageData {};
+  }
 }
 
 export type FileType = 'pdf' | 'excel' | 'word';
@@ -22,17 +33,18 @@ export interface ExtractedData {
 
 export async function extractPDF(buffer: Buffer): Promise<ExtractedData> {
   try {
-    // We use a dynamic import/require and clear the cache if needed, 
-    // but the polyfill above should solve the evaluation error
     const pdfParse = require('pdf-parse');
     const data = await pdfParse(buffer);
+    const extractedText = data.text || "";
+    console.log(`[PDF Extraction] Extracted ${extractedText.length} characters from ${data.numpages} pages`);
     return {
       fileType: 'pdf',
-      text: data.text || "",
+      text: extractedText,
       pages: data.numpages,
     };
   } catch (err) {
     console.error("PDF Extraction Error:", err);
+    // Return empty but don't crash - let the caller decide what to do
     return {
       fileType: 'pdf',
       text: "",

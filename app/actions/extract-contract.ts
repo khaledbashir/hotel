@@ -27,17 +27,14 @@ export async function extractContractData(formData: FormData) {
     
     // Step 2: Use text-based extraction for documents (PDF/Word/Excel)
     if (extraction.text && extraction.text.trim().length > 20) {
-      console.log('[extractContractData] Using text extraction...');
+      console.log(`[extractContractData] Using text extraction (${extraction.text.length} chars)...`);
       result = await extractContractFromText(extraction.text);
-    } else if (file.type.startsWith('image/')) {
-      // Only use vision if it's an actual image format
-      console.log('[extractContractData] Using vision extraction for image...');
-      const base64 = buffer.toString('base64');
-      const imageDataUrl = `data:${file.type};base64,${base64}`;
-      result = await extractContractFromImages([imageDataUrl]);
     } else {
-      // If we're here, text extraction failed and it's not an image
-      throw new Error('Could not extract text from this document. Please ensure it is not a scanned image PDF without OCR.');
+      // If text extraction failed or returned very little text,
+      // try asking the AI to work with whatever text we have
+      console.log('[extractContractData] Text extraction returned minimal content, attempting AI extraction anyway...');
+      const promptText = extraction.text || "No text could be extracted from this document.";
+      result = await extractContractFromText(promptText + "\n\nPlease extract any available hotel contract information. If no data is present, return a structure with placeholder values and set confidence to 0.");
     }
     
     // Step 3: Save to Database (Production Ready)
