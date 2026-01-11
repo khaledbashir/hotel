@@ -23,7 +23,10 @@ export async function extractContractData(formData: FormData) {
     // Step 1: Extract text (and potentially metadata) from the document
     const extraction = await extractDocument(buffer, file.type, file.name);
     
-    let result;
+    console.log(`[extractContractData] Extracted text length: ${extraction.text?.length || 0}`);
+    if (extraction.text) {
+      console.log(`[extractContractData] Text sample: ${extraction.text.substring(0, 200)}...`);
+    }
     
     // Step 2: Use text-based extraction for documents (PDF/Word/Excel)
     if (extraction.text && extraction.text.trim().length > 20) {

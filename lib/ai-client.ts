@@ -115,6 +115,9 @@ export async function extractContractFromText(
     throw new Error('ZAI_API_KEY not configured');
   }
 
+  // Pre-process text to remove excessive whitespace and clean up
+  const cleanText = text.replace(/\s+/g, ' ').trim().slice(0, 30000); 
+
   const response = await fetch(`${API_CONFIG.baseURL}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -126,28 +129,41 @@ export async function extractContractFromText(
       messages: [
         {
           role: 'system',
-          content: `You are an expert hotel contract analyst. Extract data in valid JSON format without markdown formatting.
+          content: `You are an expert hospitality contract analyst. Extract data from hotel contracts.
 
-CRITICAL: Always return a complete JSON object with ALL required fields. Use placeholder values if information is missing.
+CRITICAL:
+1. Identifying the Hotel: Look for the hotel name in headers or first page. DO NOT return "Unknown Hotel" if there's any mention of a company name.
+2. JSON Format: You MUST return ONLY valid JSON. 
 
-Required JSON structure:
+Expected JSON Structure:
 {
-  "hotelName": "string",
+  "hotelName": "Exact Hotel Name",
   "contractStartDate": "YYYY-MM-DD",
   "contractEndDate": "YYYY-MM-DD",
   "currency": "USD",
   "cancellationPolicy": "string",
   "paymentTerms": "string",
-  "roomRates": [],
-  "confidence": 0.5
-}`,
+  "roomRates": [
+    {
+      "roomType": "Deluxe/Superior/etc",
+      "season": "string",
+      "rate": number,
+      "mealPlan": "RO/BB/HB/FB/AI",
+      "currency": "USD",
+      "validFrom": "YYYY-MM-DD",
+      "validTo": "YYYY-MM-DD"
+    }
+  ],
+  "confidence": number
+}`
         },
         {
           role: 'user',
-          content: `Extract structured hotel contract data from this text:\n\n${text}`,
+          content: `Extract from this text:\n\n${cleanText}`
         },
       ],
-      temperature: 0.1,
+      temperature: 0,
+      max_tokens: 3000,
     }),
   });
 
@@ -158,10 +174,11 @@ Required JSON structure:
   
   try {
     const parsed = JSON.parse(jsonContent);
-    // Ensure roomRates exists
     return {
       ...parsed,
       roomRates: parsed.roomRates || [],
+      hotelName: parsed.hotelName || 'Unknown Hotel',
+      currency: parsed.currency || 'USD'
     };
   } catch (e) {
     throw new Error('AI returned invalid JSON format from text model.');
