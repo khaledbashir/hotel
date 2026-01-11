@@ -16,7 +16,7 @@ export function UploadZone() {
     async (file: File) => {
       // Validate file type
       const validTypes = [
-        "application/pdf", 
+        "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/vnd.ms-excel",
@@ -41,22 +41,28 @@ export function UploadZone() {
         // Create FormData and send to server action
         const formData = new FormData();
         formData.append('file', file);
-        
+
         // Use real AI extraction
         console.log('[UploadZone] Starting extraction for:', file.name);
-        const extractedData = await extractContractData(formData);
-        console.log('[UploadZone] Extraction successful');
-        
-        // Update store with extracted data
-        useContractStore.getState().setContract(extractedData);
-        
-        toast.success("Contract extracted successfully!");
+        const result = await extractContractData(formData);
+
+        if (result.error) {
+          console.error('[UploadZone] Extraction failed:', result.error);
+          toast.error(`Extraction failed: ${result.error}`);
+          return;
+        }
+
+        if (result.data) {
+          console.log('[UploadZone] Extraction successful');
+          // Update store with extracted data
+          useContractStore.getState().setContract(result.data);
+          toast.success("Contract extracted successfully!");
+        }
       } catch (error) {
-        console.error('[UploadZone] Extraction error:', error);
+        console.error('[UploadZone] Fatal error during extraction:', error);
         toast.error(
-          `Failed to extract contract: ${error instanceof Error ? error.message : 'Unknown error'}`
+          `A fatal error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`
         );
-        // Don't fallback to mock - show the real error
       } finally {
         setLoading(false);
       }
@@ -85,11 +91,10 @@ export function UploadZone() {
 
   return (
     <Card
-      className={`relative border-2 border-dashed transition-all duration-200 ${
-        isDragging
+      className={`relative border-2 border-dashed transition-all duration-200 ${isDragging
           ? "border-primary bg-primary/5 scale-[1.02]"
           : "border-muted-foreground/25 hover:border-primary/50"
-      }`}
+        }`}
       onDragOver={(e) => {
         e.preventDefault();
         e.stopPropagation();

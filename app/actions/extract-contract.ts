@@ -2,53 +2,51 @@
 
 import { extractContractFromImages, extractContractFromText, ExtractionResponse } from '@/lib/ai-client';
 import { extractDocument } from '@/lib/document-extractor';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 // Server action to extract contract data from uploaded document
 export async function extractContractData(formData: FormData) {
   const file = formData.get('file') as File;
-  
+
   if (!file) {
-    throw new Error('No file provided');
+    return { error: 'No file provided' };
   }
 
   console.log('[extractContractData] Starting extraction for:', file.name);
-  
+
   try {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    
+
     // Step 1: Extract text (and potentially metadata) from the document
     const extraction = await extractDocument(buffer, file.type, file.name);
-    
+
     console.log(`[extractContractData] Extracted text length: ${extraction.text?.length || 0}`);
-    if (extraction.text) {
-      console.log(`[extractContractData] Text sample: ${extraction.text.substring(0, 200)}...`);
-    }
-    
+
     let result: ExtractionResponse | null = null;
 
     // Step 2: Extract data using AI
-    if (file.type.startsWith('image/')) {
-      console.log('[extractContractData] Using image vision extraction...');
-      const base64 = buffer.toString('base64');
-      const imageUrl = `data:${file.type};base64,${base64}`;
-      result = await extractContractFromImages([imageUrl]);
-    } else if (extraction.text && extraction.text.trim().length > 20) {
-      console.log(`[extractContractData] Using text extraction (${extraction.text.length} chars)...`);
-      result = await extractContractFromText(extraction.text);
-    } else {
-      // If text extraction failed or returned very little text,
-      // try asking the AI to work with whatever text we have
-      console.log('[extractContractData] Text extraction returned minimal content, attempting AI extraction anyway...');
-      const promptText = extraction.text || "No text could be extracted from this document.";
-      result = await extractContractFromText(promptText + "\n\nPlease extract any available hotel contract information. If no data is present, return a structure with placeholder values and set confidence to 0.");
+    try {
+      if (file.type.startsWith('image/')) {
+        console.log('[extractContractData] Using image vision extraction...');
+        const base64 = buffer.toString('base64');
+        const imageUrl = `data:${file.type};base64,${base64}`;
+        result = await extractContractFromImages([imageUrl]);
+      } else if (extraction.text && extraction.text.trim().length > 20) {
+        console.log(`[extractContractData] Using text extraction (${extraction.text.length} chars)...`);
+        result = await extractContractFromText(extraction.text);
+      } else {
+        console.log('[extractContractData] Text extraction returned minimal content, attempting AI extraction anyway...');
+        const promptText = extraction.text || "No text could be extracted from this document.";
+        result = await extractContractFromText(promptText + "\n\nPlease extract any available hotel contract information. If no data is present, return a structure with placeholder values and set confidence to 0.");
+      }
+    } catch (aiError) {
+      console.error('[extractContractData] AI Extraction Error:', aiError);
+      return { error: `AI Extraction failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}` };
     }
-    
+
     if (!result) {
-      throw new Error('Failed to extract data from document.');
+      return { error: 'Failed to extract data from document.' };
     }
 
     // Map seasons to enum values
@@ -65,7 +63,6 @@ export async function extractContractData(formData: FormData) {
     // Step 3: Save to Database (Production Ready - 3-Layer Storage)
     let savedContractId = '';
     try {
-      // Wrap in transaction for atomic 3-layer storage
       const savedContract = await prisma.contract.create({
         data: {
           hotelName: result.hotelName || 'Unknown Hotel',
@@ -76,7 +73,7 @@ export async function extractContractData(formData: FormData) {
           contractStartDate: result.contractStartDate ? new Date(result.contractStartDate) : new Date(),
           contractEndDate: result.contractEndDate ? new Date(result.contractEndDate) : new Date(),
           baseCurrency: (result.currency || 'USD') as any,
-          cancellationPolicy: 'FREE_CANCELLATION', 
+          cancellationPolicy: 'FREE_CANCELLATION',
           commissionType: 'PERCENTAGE',
           commissionPayment: 'MONTHLY',
           paymentTerms: 'NET_DAYS',
@@ -107,28 +104,33 @@ export async function extractContractData(formData: FormData) {
         },
       });
       savedContractId = savedContract.id;
-      console.log('[extractContractData] Saved to DB (3-Layer Atomic) with ID:', savedContractId);
+      console.log('[extractContractData] Saved to DB with ID:', savedContractId);
     } catch (dbError) {
       console.error('[extractContractData] DB Save Error:', dbError);
+      // We don't return here because we still want to return the extracted data to the UI
+      // even if DB save fails (though we should ideally inform the user)
     }
-    
+
+    // Return sanitized result (no BigInt, proper season mapping)
     return {
-      hotelName: result.hotelName || 'Unknown Hotel',
-      contractStartDate: result.contractStartDate || new Date().toISOString().split('T')[0],
-      contractEndDate: result.contractEndDate || new Date().toISOString().split('T')[0],
-      currency: result.currency || 'USD',
-      cancellationPolicy: result.cancellationPolicy,
-      paymentTerms: result.paymentTerms,
-      roomRates: (result.roomRates || []).map((rate: any) => ({
-        ...rate,
-        season: rate.season === 'Year-round' ? 'YEAR_ROUND' : rate.season,
-      })),
-      extractedAt: new Date().toISOString(),
-      confidence: result.confidence || 0.85,
-      dbId: savedContractId,
+      data: {
+        hotelName: result.hotelName || 'Unknown Hotel',
+        contractStartDate: result.contractStartDate || new Date().toISOString().split('T')[0],
+        contractEndDate: result.contractEndDate || new Date().toISOString().split('T')[0],
+        currency: result.currency || 'USD',
+        cancellationPolicy: result.cancellationPolicy,
+        paymentTerms: result.paymentTerms,
+        roomRates: (result.roomRates || []).map((rate: any) => ({
+          ...rate,
+          season: mapSeason(rate.season),
+        })),
+        extractedAt: new Date().toISOString(),
+        confidence: result.confidence || 0.85,
+        dbId: savedContractId,
+      }
     };
   } catch (error) {
     console.error('[extractContractData] Global Error:', error);
-    throw error;
+    return { error: `Server error: ${error instanceof Error ? error.message : 'Unknown error'}` };
   }
 }
